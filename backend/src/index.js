@@ -13,7 +13,6 @@ const cors = require("cors");
 
 const corsOptions = {
   origin: [
-    "http://localhost:5173",
     "https://code-arena-rho-smoky.vercel.app/" 
   ],
   credentials: true,
