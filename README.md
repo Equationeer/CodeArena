@@ -3,7 +3,7 @@ Built a LeetCode clone using the MERN stack (MongoDB, Express, React, Node.js) t
 
 
 
-## 🧩 Project Setup: MERN Stack (MongoDB, Express, React, Node.js)
+##  Project Setup: MERN Stack (MongoDB, Express, React, Node.js)
 
 ###  Prerequisites
 
@@ -18,7 +18,7 @@ Make sure the following are installed globally:
 
 ---
 
-## 🔧 Step-by-Step Installation
+##  Step-by-Step Installation
 
 ###  Clone the Repository
 
