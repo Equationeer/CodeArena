@@ -190,7 +190,7 @@ export default function HomePage() {
                         <a href="#" className="hover:text-blue-400 transition">Contact</a>
                     </div>
 
-                    <span>© 2026 Leetcode Inc.</span>
+                    <span>© CodeArena</span>
 
                 </div>
 
