@@ -181,7 +181,7 @@ export default function HomePage() {
 
                 <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
 
-                    <span className="text-xl font-bold text-white">DevPractice.</span>
+                    <span className="text-xl font-bold text-white">CodeArena</span>
 
                     <div className="flex gap-8">
                         <a href="#" className="hover:text-blue-400 transition">About</a>
