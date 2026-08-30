@@ -25,7 +25,7 @@ const Editorial = ({ secureUrl, thumbnailUrl, duration }) => {
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isMiniPlayer, setIsMiniPlayer] = useState(false);
 
-  const storageKey = `video-progress-${secureUrl}`;
+  const storageKey = secureUrl ? `video-progress-${secureUrl}` : null;
 
   // Format time
   const formatTime = (time) => {
@@ -43,20 +43,34 @@ const Editorial = ({ secureUrl, thumbnailUrl, duration }) => {
 
   // Progress update + save
   const handleTimeUpdate = () => {
+    if (!videoRef.current) return;
     const current = videoRef.current.currentTime;
-    const duration = videoRef.current.duration;
+    const duration = videoRef.current.duration || 0;
     setCurrentTime(current);
-    setProgress((current / duration) * 100);
-    localStorage.setItem(storageKey, current);
+    setProgress(duration ? (current / duration) * 100 : 0);
+    if (storageKey) localStorage.setItem(storageKey, current);
   };
 
   // Load saved progress
   useEffect(() => {
+    if (!storageKey) return;
     const saved = localStorage.getItem(storageKey);
     if (saved && videoRef.current) {
       videoRef.current.currentTime = parseFloat(saved);
     }
-  }, []);
+  }, [storageKey]);
+
+  if (!secureUrl) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 bg-slate-900/40 border border-slate-800 rounded-2xl text-center space-y-3 m-6">
+        <Play className="w-12 h-12 text-slate-600 mb-2" />
+        <h3 className="text-lg font-medium text-slate-300">No Editorial Video Available</h3>
+        <p className="text-sm text-slate-500 max-w-sm">
+          A video solution has not been uploaded for this problem yet. Check the reference solution or discussion tabs in the meantime!
+        </p>
+      </div>
+    );
+  }
 
   // Seek
   const handleSeek = (e) => {

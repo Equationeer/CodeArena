@@ -1,13 +1,27 @@
 const axios = require("axios");
 
+const normalizeLanguage = (lang) => {
+  if (!lang) return "";
+  const l = lang.toString().trim().toLowerCase();
+  if (l === "c++" || l === "cpp" || l === "cplusplus") return "cpp";
+  if (l === "javascript" || l === "js") return "javascript";
+  if (l === "python" || l === "python3" || l === "py") return "python";
+  if (l === "java") return "java";
+  if (l === "typescript" || l === "ts") return "typescript";
+  return l;
+};
+
 const getLanguageById = (lang) => {
   const language = {
     "c++": 105,
     "cpp": 105,
     "java": 91,
     "javascript": 97,
+    "python": 71,
+    "typescript": 74,
   };
-  return language[lang.toLowerCase()];
+  const normalized = normalizeLanguage(lang);
+  return language[normalized] || language[lang?.toString().toLowerCase()];
 };
 
 const API_KEYS = [
@@ -52,12 +66,15 @@ const submitBatch = async (submissions) => {
       return response.data;
     } catch (error) {
       const status = error.response?.status;
+      const errorData = error.response?.data;
+      console.error(`Judge0 submitBatch error (HTTP ${status}):`, errorData || error.message);
 
       if (status === 429 || status === 401) {
         continue;
       }
 
-      throw error;
+      const detail = typeof errorData === "object" ? JSON.stringify(errorData) : (errorData || error.message);
+      throw new Error(`Judge0 API error: ${detail}`);
     }
   }
 
@@ -69,12 +86,16 @@ const submitToken = async (resultToken) => {
     throw new Error("No Judge0 API keys found in environment");
   }
 
+  if (!resultToken || resultToken.length === 0) {
+    return [];
+  }
+
   const waiting = (ms) =>
     new Promise((resolve) => setTimeout(resolve, ms));
 
   for (let k = 0; k < API_KEYS.length; k++) {
     const key = getNextKey();
-    console.log(key);
+    // console.log(key);
 
     const fetchData = async () => {
       try {
@@ -95,12 +116,15 @@ const submitToken = async (resultToken) => {
         return response.data;
       } catch (error) {
         const status = error.response?.status;
+        const errorData = error.response?.data;
+        console.error(`Judge0 submitToken error (HTTP ${status}):`, errorData || error.message);
 
         if (status === 429 || status === 401) {
           return null;
         }
 
-        throw error;
+        const detail = typeof errorData === "object" ? JSON.stringify(errorData) : (errorData || error.message);
+        throw new Error(`Judge0 Token error: ${detail}`);
       }
     };
 
@@ -126,6 +150,7 @@ const submitToken = async (resultToken) => {
 };
 
 module.exports = {
+  normalizeLanguage,
   getLanguageById,
   submitBatch,
   submitToken,

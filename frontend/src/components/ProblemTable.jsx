@@ -83,7 +83,9 @@ const ProblemsTable = ({ problems }) => {
       <div className="divide-y divide-slate-800/50">
         {problems.length > 0 ? (
           problems.map((problem, idx) => (
-            <button onClick={()=>{handleroute(problem._id)}} className='min-w-full text-left'><ProblemRow key={problem.id} problem={problem} index={idx} /></button>
+            <button key={problem._id || idx} onClick={()=>{handleroute(problem._id)}} className='min-w-full text-left'>
+              <ProblemRow problem={problem} index={idx} />
+            </button>
           ))
         ) : (
           <div className="p-12 text-center text-slate-500">

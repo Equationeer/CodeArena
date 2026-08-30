@@ -99,13 +99,15 @@ const saveVideoMetadata = async (req, res) => {
 
 const getVideo = async (req, res) => {
   try {
-    const problemId = req.params.problemId;
-    const Video = await SolutionVideo.findOne({ problemId: problemId }).select("secureUrl thumbnailUrl duration");
-    if (!Video) return res.status(404).send("Video Not found");
-    console.log(Video);
-    res.status(200).send(Video);
+    const { problemId } = req.params;
+    const video = await SolutionVideo.findOne({ problemId }).select("secureUrl thumbnailUrl duration");
+    if (!video) {
+      return res.status(200).json(null);
+    }
+    return res.status(200).json(video);
   } catch (err) {
-    res.status(500).send("Error in finding the video : " + err);
+    console.error("Error in finding the video:", err);
+    return res.status(500).json({ error: "Error in finding the video: " + err.message });
   }
 };
 

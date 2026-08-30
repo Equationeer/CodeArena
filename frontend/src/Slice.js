@@ -11,9 +11,12 @@ export const registerUser = createAsyncThunk(
       const response = await axiosMain.post("/user/register", userData);
       return response.data.data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || error.message
-      );
+      const message =
+        error.response?.data?.message ||
+        (typeof error.response?.data === "string" ? error.response.data : null) ||
+        error.message ||
+        "Registration failed";
+      return rejectWithValue(message);
     }
   }
 );

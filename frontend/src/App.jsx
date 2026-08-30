@@ -51,9 +51,10 @@ function AnimatedRoutes() {
     </div>;
   }
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    <>
       <Navbar />
-      <Routes location={location} key={location.pathname}>
+      <AnimatePresence mode="wait" initial={false}>
+        <Routes location={location} key={location.pathname}>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <Login />} />
         <Route path="/signup" element={isAuthenticated ? <Navigate to="/" /> : <SignUp />} />
@@ -123,7 +124,8 @@ function AnimatedRoutes() {
           }
         />
       </Routes>
-    </AnimatePresence>
+      </AnimatePresence>
+    </>
   );
 }
 

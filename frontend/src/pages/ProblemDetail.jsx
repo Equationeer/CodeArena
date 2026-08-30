@@ -18,7 +18,27 @@ import {
 import SubmissionHistory from '../components/SubmissionHistory';
 import SubmissionResult from '../components/Result';
 import AiChat from "../components/AiChat";
-import Editorial from "../components/Editorial"
+import Editorial from "../components/Editorial";
+
+const LANGUAGE_DISPLAY_NAMES = {
+  cpp: "C++",
+  "c++": "C++",
+  java: "Java",
+  javascript: "JavaScript",
+  python: "Python",
+  typescript: "TypeScript",
+};
+
+const normalizeLanguage = (lang = "") => {
+  if (!lang) return "";
+  const l = lang.toString().trim().toLowerCase();
+  if (l === "c++" || l === "cpp" || l === "cplusplus") return "cpp";
+  if (l === "javascript" || l === "js") return "javascript";
+  if (l === "python" || l === "python3" || l === "py") return "python";
+  if (l === "java") return "java";
+  if (l === "typescript" || l === "ts") return "typescript";
+  return l;
+};
 
 const ProblemDetailPage = () => {
 
@@ -32,26 +52,24 @@ const ProblemDetailPage = () => {
       try {
         const res = await axiosMain.get(`problem/problemById/${id}`);
         setProblemData(res.data);
-        // console.log(res.data);
       } catch (err) {
-        console.log(err);
+        console.error("Error fetching problem:", err);
       }
-    }
+    };
     fetchProblem();
   }, [id]);
 
   useEffect(() => {
     const fetchSubmissions = async () => {
       try {
-        const res=await axiosMain.get(`problem/submittedProblem/${id}`);
-        // console.log(res.data);
+        const res = await axiosMain.get(`problem/submittedProblem/${id}`);
         setAllSubmission(res.data);
       } catch (error) {
-        console.log("Error: " + error.message);
+        console.error("Error fetching submissions:", error);
       }
-    }
+    };
     fetchSubmissions();
-  },[id,submissionResult])
+  }, [id, submissionResult]);
 
   const {
     title,
@@ -79,7 +97,7 @@ const ProblemDetailPage = () => {
 
   const [refLang, setRefLang] = useState("");
 
-  const [Video,setVideo]=useState({});
+  const [Video, setVideo] = useState({});
 
   const editorRef = useRef(null);
   const monacoRef = useRef(null);
@@ -92,67 +110,90 @@ const ProblemDetailPage = () => {
   const runCode = async () => {
     if (!editorRef.current) return;
     setRunLoading(true);
-    const code = editorRef.current.getValue();
-    const runReq = {
-      code: code,
-      language: selectedLang
+    try {
+      const code = editorRef.current.getValue();
+      const runReq = {
+        code: code,
+        language: normalizeLanguage(selectedLang)
+      };
+      const result = await axiosMain.post(`submission/run/${id}`, runReq);
+      setResultTest(result.data);
+    } catch (err) {
+      console.error("Error running code:", err);
+      const errMsg = err.response?.data?.error || err.response?.data || err.message;
+      alert(`Run failed: ${errMsg}`);
+    } finally {
+      setRunLoading(false);
     }
-    const result = await axiosMain.post(`submission/run/${id}`, runReq);
-    setRunLoading(false);
-    // console.log(result.data);
-    setResultTest(result.data);
   };
+
   const handleTest = (i) => {
     setActiveTest(i);
-  }
+  };
+
   const submitCode = async () => {
     if (!editorRef.current) return;
     setLoading(true);
-    runCode();
-    const code = editorRef.current.getValue();
-    const runReq = {
-      code: code,
-      language: selectedLang
-    }
     setActiveNav('result');
     setActiveTab('result');
-    const result = await axiosMain.post(`submission/submit/${id}`, runReq);
-    // console.log(result);
-    setLoading(false);
-    setSubmissionResult(result.data);
+    try {
+      const code = editorRef.current.getValue();
+      const runReq = {
+        code: code,
+        language: normalizeLanguage(selectedLang)
+      };
+      const result = await axiosMain.post(`submission/submit/${id}`, runReq);
+      setSubmissionResult(result.data);
+    } catch (err) {
+      console.error("Error submitting code:", err);
+      const errMsg = err.response?.data?.error || err.response?.data || err.message;
+      setSubmissionResult({
+        status: "Error",
+        errorMessage: errMsg,
+        testCasePassed: 0,
+        testCasesTotal: (problemData?.invisibleTestCases || []).length || (problemData?.visibleTestCases || []).length || 0,
+        runtime: 0,
+        memory: 0,
+        language: normalizeLanguage(selectedLang),
+        code: editorRef.current ? editorRef.current.getValue() : "",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     if (startCode.length > 0) {
-      setSelectedLang(startCode[0].language);
-      setEditorCode(startCode[0].initialCode);
+      const initialLang = normalizeLanguage(startCode[0].language);
+      setSelectedLang(initialLang);
+      setEditorCode(startCode[0].initialCode || startCode[0].code || "");
     }
   }, [startCode]);
 
   useEffect(() => {
-    const langData = startCode.find(c => c.language === selectedLang);
+    const langData = startCode.find(
+      (c) => normalizeLanguage(c.language) === normalizeLanguage(selectedLang)
+    );
     if (langData && editorRef.current) {
-      editorRef.current.setValue(langData.initialCode || " ");
+      editorRef.current.setValue(langData.initialCode || langData.code || " ");
     }
   }, [selectedLang, startCode]);
   
-  useEffect(()=>{
+  useEffect(() => {
     const fetchVideo = async () => {
       try {
-        const res=await axiosMain.get(`video/getVideo/${id}`);
-        setVideo(res.data);
-        // console.log(res.data);
+        const res = await axiosMain.get(`video/getVideo/${id}`);
+        setVideo(res.data || {});
       } catch (error) {
-        console.log("Error: " + error.message);
+        console.error("Error fetching video:", error);
       }
-    }
+    };
     fetchVideo();
-  },[id])
-
+  }, [id]);
 
   useEffect(() => {
     if (referenceSolution.length > 0) {
-      setRefLang(referenceSolution[0].language);
+      setRefLang(normalizeLanguage(referenceSolution[0].language));
     }
   }, [referenceSolution]);
 
@@ -282,18 +323,19 @@ const ProblemDetailPage = () => {
 
           </motion.div>
 
-        ) :
-          <AnimatePresence mode='wait' >
-            {/* Description */}
-            {
-              activeNav === "description" && (
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5 }}
-                  className="p-6 space-y-8"
-                >
-
+        ) : (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeNav}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25 }}
+              className="h-full"
+            >
+              {/* Description */}
+              {activeNav === "description" && (
+                <div className="p-6 space-y-8">
                   <section className="space-y-4">
                     <h1 className="text-3xl font-bold tracking-tight text-white">{title}</h1>
 
@@ -340,7 +382,6 @@ const ProblemDetailPage = () => {
                           transition={{ delay: 0.3 + index * 0.1 }}
                           className="group bg-slate-900/40 border border-slate-800 rounded-xl p-4 hover:border-slate-600 transition-colors"
                         >
-
                           <div className="flex justify-between items-start mb-3">
                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                               Case {index + 1}
@@ -352,7 +393,6 @@ const ProblemDetailPage = () => {
                           </div>
 
                           <div className="space-y-3 font-mono text-sm">
-
                             <div>
                               <p className="text-slate-500 text-xs mb-1">Input:</p>
                               <pre className="bg-slate-950 p-2 rounded border border-slate-800 text-blue-300">
@@ -375,41 +415,30 @@ const ProblemDetailPage = () => {
                                 </p>
                               </div>
                             )}
-
                           </div>
                         </motion.div>
                       ))}
                     </div>
                   </section>
-
-
-
-                </motion.div>
-              )
-            }
-            {/* Result */}
-            {activeNav === "result" && (
-
-              submissionResult ? (
-                <SubmissionResult result={submissionResult} />
-              ) : (
-                <div className="flex items-center justify-center h-full text-slate-600 italic">
-                  Submit your code to see result
                 </div>
-              )
-            )}
+              )}
 
-            {/* Soltuion */}
+              {/* Result */}
+              {activeNav === "result" && (
+                submissionResult ? (
+                  <SubmissionResult result={submissionResult} />
+                ) : (
+                  <div className="flex items-center justify-center p-12 text-slate-600 italic">
+                    Submit your code to see result
+                  </div>
+                )
+              )}
 
-            {
-              activeNav === "solution" && (
-                <motion.div initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5 }}
-                  className="p-6 space-y-8">
+              {/* Solution */}
+              {activeNav === "solution" && (
+                <div className="p-6 space-y-8">
                   {/* REFERENCE SOLUTION */}
                   <section className="pb-10">
-
                     <button
                       onClick={() => setShowRefSolution(!showRefSolution)}
                       className="flex items-center gap-2 w-full p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400 hover:bg-indigo-500/20 transition-all"
@@ -424,14 +453,12 @@ const ProblemDetailPage = () => {
 
                     <AnimatePresence>
                       {showRefSolution && referenceSolution.length > 0 && (
-
                         <motion.div
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
                           className="overflow-hidden mt-4 rounded-xl border border-slate-800"
                         >
-
                           {/* LANGUAGE DROPDOWN */}
                           <div className="flex items-center gap-4 px-4 py-2 border-b border-slate-800 bg-[#0f172a]">
                             <div className="relative">
@@ -440,11 +467,14 @@ const ProblemDetailPage = () => {
                                 onChange={(e) => setRefLang(e.target.value)}
                                 className="appearance-none bg-slate-800 border border-slate-700 text-sm rounded-md px-4 py-1.5 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                               >
-                                {referenceSolution.map((lang, idx) => (
-                                  <option key={idx} value={lang.language}>
-                                    {lang.language.charAt(0).toUpperCase() + lang.language.slice(1)}
-                                  </option>
-                                ))}
+                                {referenceSolution.map((lang, idx) => {
+                                  const norm = normalizeLanguage(lang.language);
+                                  return (
+                                    <option key={idx} value={norm}>
+                                      {LANGUAGE_DISPLAY_NAMES[norm] || norm}
+                                    </option>
+                                  );
+                                })}
                               </select>
                               <HiChevronDown className="absolute right-2 top-2.5 text-slate-400" />
                             </div>
@@ -454,7 +484,11 @@ const ProblemDetailPage = () => {
                             height="300px"
                             theme="vs-dark"
                             language={refLang || "cpp"}
-                            value={referenceSolution.find(c => c.language === refLang)?.completeCode || ""}
+                            value={
+                              referenceSolution.find(
+                                (c) => normalizeLanguage(c.language) === normalizeLanguage(refLang)
+                              )?.completeCode || ""
+                            }
                             options={{
                               readOnly: true,
                               minimap: { enabled: false },
@@ -462,42 +496,40 @@ const ProblemDetailPage = () => {
                               padding: { top: 16 }
                             }}
                           />
-
                         </motion.div>
                       )}
                     </AnimatePresence>
                   </section>
-                </motion.div>
-              )
-            }
-            {/* Editorial */}
-            {
-              activeNav==='editorial'&&(
-                <Editorial secureUrl={Video.secureUrl} thumbnailUrl={Video.thumbnailUrl} duration={Video.duration}/>
-              )
-            }
+                </div>
+              )}
 
-            {/* Submissions  */}
-            {
-              activeNav=="submissions" && (
-                <>
-                 <SubmissionHistory submissions={allSubmissions} />
-                </>
-              )
-            }
-            {/* ChatBot */}
-            {
-              activeNav=="aiChat"&&(
-                <>
-                <AiChat problemData={problemData} code={editorRef.current.getValue()}/>
-                </>
-              )
-            }
+              {/* Editorial */}
+              {activeNav === 'editorial' && (
+                <Editorial
+                  secureUrl={Video?.secureUrl}
+                  thumbnailUrl={Video?.thumbnailUrl}
+                  duration={Video?.duration}
+                />
+              )}
+
+              {/* Submissions */}
+              {activeNav === "submissions" && (
+                <SubmissionHistory submissions={allSubmissions} />
+              )}
+
+              {/* ChatBot */}
+              {activeNav === "aiChat" && (
+                <AiChat
+                  problemData={problemData}
+                  code={editorRef.current ? editorRef.current.getValue() : ""}
+                />
+              )}
+            </motion.div>
           </AnimatePresence>
-        }
+        )}
       </div>
       {/* RIGHT PANEL */}
-      <div className="w-full lg:w-[55%] flex flex-col h-screen bg-[#0e1525]  custom-scrollbar">
+      <div className="w-full lg:w-[55%] flex flex-col h-screen bg-[#0e1525] custom-scrollbar">
         <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-[#0f172a]">
           <div className="flex items-center gap-4">
             <div className="relative group">
@@ -506,19 +538,24 @@ const ProblemDetailPage = () => {
                 onChange={(e) => setSelectedLang(e.target.value)}
                 className="appearance-none bg-slate-800 border border-slate-700 text-sm rounded-md px-4 py-1.5 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
-                {startCode.map(lang => (
-                  <option key={lang.language} value={lang.language}>
-                    {lang.language.charAt(0).toUpperCase() + lang.language.slice(1)}
-                  </option>
-                ))}
+                {startCode.map((lang, idx) => {
+                  const norm = normalizeLanguage(lang.language);
+                  return (
+                    <option key={idx} value={norm}>
+                      {LANGUAGE_DISPLAY_NAMES[norm] || norm}
+                    </option>
+                  );
+                })}
               </select>
               <HiChevronDown className="absolute right-2 top-2.5 pointer-events-none text-slate-400" />
             </div>
             <button
               onClick={() => {
-                const original = startCode.find(c => c.language === selectedLang);
+                const original = startCode.find(
+                  (c) => normalizeLanguage(c.language) === normalizeLanguage(selectedLang)
+                );
                 if (editorRef.current && original) {
-                  editorRef.current.setValue(original.code);
+                  editorRef.current.setValue(original.initialCode || original.code || "");
                 }
               }}
               className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-all"
@@ -534,7 +571,7 @@ const ProblemDetailPage = () => {
           <Editor
             height="100%"
             theme="vs-dark"
-            language={selectedLang}
+            language={normalizeLanguage(selectedLang) || "cpp"}
             value={editorCode || ""}
             onMount={handleEditorDidMount}
             options={{
@@ -648,47 +685,59 @@ const ProblemDetailPage = () => {
             ) : null}
 
           </div>
-          {
-            loading == true || runLoading == true ? (
-              <div className="sticky bottom-0 p-4 border-t border-slate-800 bg-[#0f172a] flex justify-end gap-3 z-10">
+          <div className="sticky bottom-0 p-4 border-t border-slate-800 bg-[#0f172a] flex justify-end gap-3 z-10">
+            <motion.button
+              onClick={runCode}
+              disabled={runLoading || loading}
+              whileHover={{ scale: runLoading || loading ? 1 : 1.02 }}
+              whileTap={{ scale: runLoading || loading ? 1 : 0.98 }}
+              className={`flex items-center gap-2 px-6 py-2 rounded-lg font-semibold border transition-all ${
+                runLoading
+                  ? "bg-slate-800 text-blue-400 border-blue-500/30 cursor-not-allowed"
+                  : loading
+                  ? "bg-slate-800/50 text-slate-500 border-slate-800 cursor-not-allowed"
+                  : "bg-slate-800 hover:bg-slate-700 text-white border-slate-700 cursor-pointer"
+              }`}
+            >
+              {runLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                  <span>Running...</span>
+                </>
+              ) : (
+                <>
+                  <HiPlay />
+                  <span>Run Code</span>
+                </>
+              )}
+            </motion.button>
 
-                <div
-                  className="flex items-center gap-2 px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-lg border border-slate-700"
-                >
-                  <HiPlay /> Running
-                </div>
-
-                <div
-                  className="flex items-center gap-2 px-8 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-lg"
-                >
-                  <HiCloudUpload /> Running
-                </div>
-
-              </div>
-            ) : (
-              <div className="sticky bottom-0 p-4 border-t border-slate-800 bg-[#0f172a] flex justify-end gap-3 z-10">
-
-                <motion.button
-                  onClick={runCode}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="flex items-center gap-2 px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-lg border border-slate-700"
-                >
-                  <HiPlay /> Run Code
-                </motion.button>
-
-                <motion.button
-                  onClick={submitCode}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="flex items-center gap-2 px-8 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-lg"
-                >
-                  <HiCloudUpload /> Submit
-                </motion.button>
-
-              </div>
-            )
-          }
+            <motion.button
+              onClick={submitCode}
+              disabled={loading || runLoading}
+              whileHover={{ scale: loading || runLoading ? 1 : 1.02 }}
+              whileTap={{ scale: loading || runLoading ? 1 : 0.98 }}
+              className={`flex items-center gap-2 px-8 py-2 rounded-lg font-bold transition-all ${
+                loading
+                  ? "bg-emerald-700/60 text-emerald-200 cursor-not-allowed"
+                  : runLoading
+                  ? "bg-slate-800/50 text-slate-500 cursor-not-allowed"
+                  : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white cursor-pointer"
+              }`}
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Submitting...</span>
+                </>
+              ) : (
+                <>
+                  <HiCloudUpload />
+                  <span>Submit</span>
+                </>
+              )}
+            </motion.button>
+          </div>
         </div>
 
       </div>

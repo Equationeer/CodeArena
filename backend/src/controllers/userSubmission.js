@@ -2,54 +2,74 @@ const Problem = require("../Models/problem");
 const Submission = require("../Models/submissions");
 const User = require("../Models/user");
 const {
+  normalizeLanguage,
   getLanguageById,
   submitBatch,
   submitToken,
 } = require("../utils/problemUtility");
+
 const submitCode = async (req, res) => {
   try {
     const userId = req.user._id;
     const problemId = req.params.id;
     const { code, language } = req.body;
-    // console.log(req.body);
-    // console.log(userId, problemId, code, language);
-    if (!userId || !problemId || !code || !language)
-      return res.status(400).send("Some Fields are missing");
+
+    if (!userId || !problemId || !code || !language) {
+      return res.status(400).json({ error: "Some fields are missing" });
+    }
+
     // Fetch the problem from database
     const problem = await Problem.findById(problemId);
-    if (!problem) res.status(400).send("Problem not Found");
-    // test case hidden
+    if (!problem) {
+      return res.status(404).json({ error: "Problem not found" });
+    }
 
-    // pehle submission store kar do
+    const normalizedLang = normalizeLanguage(language);
+    const languageId = getLanguageById(normalizedLang);
+
+    if (!languageId) {
+      return res.status(400).json({ error: `Unsupported language: ${language}` });
+    }
+
+    const testCases =
+      problem.invisibleTestCases && problem.invisibleTestCases.length > 0
+        ? problem.invisibleTestCases
+        : problem.visibleTestCases && problem.visibleTestCases.length > 0
+        ? problem.visibleTestCases
+        : [];
+
+    if (testCases.length === 0) {
+      return res.status(400).json({ error: "No test cases found for this problem." });
+    }
+
+    // Create initial pending submission
     const submittedResult = await Submission.create({
       userId,
       problemId,
       code,
-      language,
+      language: normalizedLang,
       testCasePassed: 0,
       status: "pending",
-      testCasesTotal: problem.invisibleTestCases.length,
+      testCasesTotal: testCases.length,
     });
 
-    const languageId = getLanguageById(language);
-
-    const submissions = problem.invisibleTestCases.map((testcase) => ({
+    const submissions = testCases.map((testcase) => ({
       source_code: code,
       language_id: languageId,
-      stdin: testcase.input,
-      expected_output: testcase.output,
+      stdin: testcase.input != null ? String(testcase.input) : "",
+      expected_output: testcase.output != null ? String(testcase.output) : "",
     }));
 
     const submitResult = await submitBatch(submissions);
-    // console.log(submitResult);
     const resultToken = submitResult.map((value) => value.token);
     const testResult = await submitToken(resultToken);
-    // console.log(submitToken);
+
     let testCasePassed = 0;
     let runtime = 0;
     let memory = 0;
     let status = "Accepted";
     let errorMessage = null;
+
     for (const test of testResult) {
       if (test.status_id == 3) {
         testCasePassed++;
@@ -65,10 +85,11 @@ const submitCode = async (req, res) => {
           status = "Wrong Answer";
         } else {
           status = "Runtime Error";
-          errorMessage = test.stderr;
+          errorMessage = test.stderr || test.compile_output || "Runtime Error";
         }
       }
     }
+
     // store the result in database in submission
     submittedResult.status = status;
     submittedResult.runtime = runtime;
@@ -77,18 +98,17 @@ const submitCode = async (req, res) => {
     submittedResult.testCasePassed = testCasePassed;
 
     await submittedResult.save();
-    // console.log(submittedResult);
 
     // Problem id ko add karenge user schema me
-    if (status == "Accepted" && !req.user.problemSolved.includes(problemId)) {
+    if (status === "Accepted" && !req.user.problemSolved.includes(problemId)) {
       req.user.problemSolved.push(problemId);
       await req.user.save();
     }
 
-    res.status(201).send(submittedResult);
+    return res.status(201).json(submittedResult);
   } catch (err) {
-    // console.log(err.message)
-    res.status(500).send("Internal Sever Error" + err.message);
+    console.error("Submit code error:", err);
+    return res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 };
 
@@ -96,28 +116,44 @@ const runCode = async (req, res) => {
   try {
     const problemId = req.params.id;
     const { code, language } = req.body;
-    if (!problemId || !code || !language)
-      return res.status(400).send("Some Fields are missing");
+    if (!problemId || !code || !language) {
+      return res.status(400).json({ error: "Some fields are missing" });
+    }
 
     const problem = await Problem.findById(problemId);
-    if (!problem) res.status(400).send("Problem not Found");
+    if (!problem) {
+      return res.status(404).json({ error: "Problem not found" });
+    }
 
-    const languageId = getLanguageById(language);
+    const normalizedLang = normalizeLanguage(language);
+    const languageId = getLanguageById(normalizedLang);
 
-    const submissions = problem.visibleTestCases.map((testcase) => ({
+    if (!languageId) {
+      return res.status(400).json({ error: `Unsupported language: ${language}` });
+    }
+
+    const visibleCases = problem.visibleTestCases || [];
+    if (visibleCases.length === 0) {
+      return res.status(400).json({ error: "No visible test cases found for this problem." });
+    }
+
+    const submissions = visibleCases.map((testcase) => ({
       source_code: code,
       language_id: languageId,
-      stdin: testcase.input,
-      expected_output: testcase.output,
+      stdin: testcase.input != null ? String(testcase.input) : "",
+      expected_output: testcase.output != null ? String(testcase.output) : "",
     }));
+
     const submitResult = await submitBatch(submissions);
     const resultToken = submitResult.map((value) => value.token);
     const testResult = await submitToken(resultToken);
-    res.status(200).send(testResult);
+    return res.status(200).json(testResult);
   } catch (err) {
-    res.status(500).send(" Error " + err.message);
+    console.error("Run code error:", err);
+    return res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 };
+
 module.exports = { submitCode, runCode };
 //  language_id: 91,
 //     stdin: '10 20',

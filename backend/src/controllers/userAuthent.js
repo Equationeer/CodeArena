@@ -8,128 +8,185 @@ const Submission = require("../Models/submissions.js");
 
 const register = async (req, res) => {
   try {
-    // validating
+    console.log("Request body:", req.body);
+    // 1. Validate fields
     validate(req.body);
     const { firstName, emailId, password } = req.body;
 
-    //Password Hashing
-    req.body.password = await bcrypt.hash(password, 10);
-    req.body.role = "user";
-    // adding to database
-    const user = await User.create(req.body);
-    //  JWT(json web Token)
-    const token = jwt.sign(
-      { _id: user._id, email: emailId, role: user.role },
-      process.env.JWT_KEY,
-      { expiresIn: "1h" },
-    );
-    const result = {
-      userId: user._id,
-      firstName: firstName,
-      emailId: emailId,
-      role: user.role,
-    };
-    console.log(result);
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none",
-      maxAge: 60 * 60 * 1000,
+    const normalizedEmail = emailId ? emailId.toLowerCase().trim() : "";
+    console.log("Email being checked:", normalizedEmail);
+
+    // 2. Check if user already exists
+    const existingUser = await User.findOne({ emailId: normalizedEmail });
+    console.log("Existing user found:", existingUser);
+
+    if (existingUser) {
+      return res.status(400).json({ message: "An account with this email already exists." });
+    }
+
+    // 3. Password Hashing
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 4. Save to database
+    const user = await User.create({
+      firstName: firstName ? firstName.trim() : "",
+      emailId: normalizedEmail,
+      password: hashedPassword,
+      role: "user",
     });
-    res.status(201).json({
-      data: result,
-      message: "User registered Sucessfully",
-    });
-  } catch (err) {
-    res.status(400).send("Error : " + err);
-  }
-};
-const login = async (req, res) => {
-  try {
-    const { emailId, password } = req.body;
-    if (!emailId) throw new Error("Enter your email address");
-    if (!password) throw new Error("Enter the password");
 
-    // finding user
-    const user = await User.findOne({ emailId });
-    if (!user) throw new Error("User not found");
+    // 5. Generate JWT Token
+    if (!process.env.JWT_KEY) {
+      throw new Error("JWT_KEY is not configured on the server");
+    }
 
-    // Checking if password is correct or not
-    const isCorrect = await bcrypt.compare(password, user.password);
-    if (!isCorrect) throw new Error("Invalid credentials");
-
-    //  JWT(json web Token)
     const token = jwt.sign(
-      { _id: user._id, email: emailId, role: user.role },
+      { _id: user._id, email: user.emailId, role: user.role },
       process.env.JWT_KEY,
-      { expiresIn: "1h" },
+      { expiresIn: "1h" }
     );
+
     const result = {
       userId: user._id,
       firstName: user.firstName,
-      emailId: emailId,
+      emailId: user.emailId,
       role: user.role,
     };
-    // console.log(result);
+
     res.cookie("token", token, {
       httpOnly: true,
       secure: true,
       sameSite: "none",
       maxAge: 60 * 60 * 1000,
     });
-    res.status(200).json({
+
+    return res.status(201).json({
       data: result,
-      message: "User Logged in Sucessfully",
+      message: "User registered successfully",
     });
   } catch (err) {
-    res.status(401).send("Error :  " + err);
+    console.error("Registration Error Details:", {
+      message: err.message,
+      code: err.code,
+      keyPattern: err.keyPattern,
+      keyValue: err.keyValue,
+    });
+
+    // Handle MongoDB duplicate key error fallback
+    if (err.code === 11000) {
+      const duplicateField = Object.keys(err.keyPattern || err.keyValue || {})[0] || "field";
+      const duplicateValue = err.keyValue ? JSON.stringify(err.keyValue) : "";
+      
+      if (duplicateField === "emailId" || duplicateField === "email") {
+        return res.status(400).json({ message: "An account with this email already exists." });
+      }
+      return res.status(400).json({
+        message: `Database duplicate key conflict on '${duplicateField}': ${duplicateValue}. Please drop any stale indexes on MongoDB.`,
+      });
+    }
+    return res.status(400).json({ message: err.message || "Registration failed" });
+  }
+};
+
+const login = async (req, res) => {
+  try {
+    const { emailId, password } = req.body;
+    if (!emailId) return res.status(400).json({ message: "Enter your email address" });
+    if (!password) return res.status(400).json({ message: "Enter the password" });
+
+    const user = await User.findOne({ emailId: emailId.toLowerCase().trim() });
+    if (!user) return res.status(401).json({ message: "User not found" });
+
+    const isCorrect = await bcrypt.compare(password, user.password);
+    if (!isCorrect) return res.status(401).json({ message: "Invalid credentials" });
+
+    if (!process.env.JWT_KEY) {
+      throw new Error("JWT_KEY is not configured on the server");
+    }
+
+    const token = jwt.sign(
+      { _id: user._id, email: user.emailId, role: user.role },
+      process.env.JWT_KEY,
+      { expiresIn: "1h" }
+    );
+
+    const result = {
+      userId: user._id,
+      firstName: user.firstName,
+      emailId: user.emailId,
+      role: user.role,
+    };
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      maxAge: 60 * 60 * 1000,
+    });
+
+    return res.status(200).json({
+      data: result,
+      message: "User Logged in Successfully",
+    });
+  } catch (err) {
+    return res.status(401).json({ message: err.message || "Login failed" });
   }
 };
 
 const logout = async (req, res) => {
   try {
     const { token } = req.cookies;
-    const payload = jwt.decode(token);
-    // set the value
-    await redisClient.set(`token:${token}`, "blocked");
-    await redisClient.expireAt(`token:${token}`, payload.exp);
-    // clear the token
-    console.log("userLogout succeessfully");
+    if (token) {
+      const payload = jwt.decode(token);
+      if (payload?.exp) {
+        await redisClient.set(`token:${token}`, "blocked");
+        await redisClient.expireAt(`token:${token}`, payload.exp);
+      }
+    }
     res.clearCookie("token", {
       httpOnly: true,
       secure: true,
       sameSite: "none",
     });
-    res.status(200).send("Logout Successfully");
+    return res.status(200).json({ message: "Logout Successfully" });
   } catch (err) {
-    res.status(401).send("Error : " + err);
+    return res.status(401).json({ message: err.message || "Logout error" });
   }
 };
+
 const adminRegister = async (req, res) => {
   try {
     validate(req.body);
     const { firstName, emailId, password } = req.body;
 
-    //Password Hashing
-    req.body.password = await bcrypt.hash(password, 10);
-    req.body.role = "admin";
-    // adding to database
-    const user = await User.create(req.body);
-    //  JWT(json web Token)
+    const existingUser = await User.findOne({ emailId: emailId.toLowerCase().trim() });
+    if (existingUser) {
+      return res.status(400).json({ message: "Email already registered" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      firstName: firstName.trim(),
+      emailId: emailId.toLowerCase().trim(),
+      password: hashedPassword,
+      role: "admin",
+    });
+
     const token = jwt.sign(
-      { _id: user._id, email: emailId },
+      { _id: user._id, email: user.emailId, role: user.role },
       process.env.JWT_KEY,
-      { expiresIn: "1h" },
+      { expiresIn: "1h" }
     );
+
     res.cookie("token", token, {
       httpOnly: true,
       secure: true,
       sameSite: "none",
       maxAge: 60 * 60 * 1000,
     });
-    res.status(201).send("User Registered successfully");
+    return res.status(201).json({ message: "Admin registered successfully" });
   } catch (err) {
-    res.status(400).send("Error : " + err);
+    return res.status(400).json({ message: err.message || "Admin registration failed" });
   }
 };
 
@@ -137,12 +194,12 @@ const deleteProfile = async (req, res) => {
   try {
     const userId = req.user._id;
     await User.findByIdAndDelete(userId);
-    // await Submission.deleteMany({userId});
-    res.status(200).send("User Deleted Successfully");
+    return res.status(200).json({ message: "User Deleted Successfully" });
   } catch (err) {
-    res.status(500).send("Error" + err.message);
+    return res.status(500).json({ message: err.message });
   }
 };
+
 const getAuth = (req, res) => {
   const { _id, firstName, emailId, role } = req.user;
   const result = {
@@ -151,7 +208,7 @@ const getAuth = (req, res) => {
     emailId: emailId,
     role: role,
   };
-  res.status(200).json({
+  return res.status(200).json({
     data: result,
     message: "User Authenticated",
   });
@@ -189,9 +246,9 @@ const getProfile = async (req, res) => {
         totalPages: Math.ceil(total / limit),
       },
     };
-    res.status(200).json(result);
+    return res.status(200).json(result);
   } catch (err) {
-    res.status(500).send("Error: " + err.message);
+    return res.status(500).json({ message: err.message });
   }
 };
 

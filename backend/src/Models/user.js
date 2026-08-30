@@ -7,12 +7,13 @@ const userSchema = new Schema(
       type: String,
       required: true,
       minLength: 3,
-      maxLength: 15,
+      maxLength: 50, // Increased from 15 to allow full names
+      trim: true,
     },
     lastName: {
       type: String,
-      minLength: 3,
-      maxLength: 15,
+      maxLength: 50,
+      trim: true,
     },
     emailId: {
       type: String,
@@ -49,11 +50,12 @@ const userSchema = new Schema(
     timestamps: true,
   },
 );
-// find by id and delete internal impletation is like findOneAndDelete
+
 userSchema.post("findOneAndDelete", async function (doc) {
   if (doc) {
     await mongoose.model("submission").deleteMany({ userId: doc._id });
   }
 });
+
 const User = mongoose.model("user", userSchema);
 module.exports = User;

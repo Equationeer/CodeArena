@@ -4,20 +4,19 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router";
-import { registerUser,authSlice} from "../Slice";
-import {useSelector,useDispatch} from "react-redux";
-
+import { registerUser } from "../Slice";
+import { useSelector, useDispatch } from "react-redux";
 
 const schema = z.object({
-  firstName: z.string().min(3, "Name is too short"),
-  emailId: z.string().email("Enter a valid email"),
+  firstName: z.string().min(3, "Name must be at least 3 characters"),
+  emailId: z.string().email("Enter a valid email address"),
   password: z
     .string()
     .min(8, "Minimum 8 characters")
-    .regex(/[A-Z]/, "Must contain one uppercase letter")
-    .regex(/[a-z]/, "Must contain one lowercase letter")
-    .regex(/[0-9]/, "Must contain one number")
-    .regex(/[^A-Za-z0-9]/, "Must contain one special character"),
+    .regex(/[A-Z]/, "Must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Must contain at least one number")
+    .regex(/[^A-Za-z0-9]/, "Must contain at least one special character"),
 });
 
 const pageVariants = {
@@ -78,7 +77,7 @@ function PasswordStrength({ password }) {
   return (
     <div className="mt-2 space-y-1">
       <div className="flex gap-1">
-        {[1,2,3,4].map((i)=>(
+        {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
             className={`h-1 flex-1 rounded-full ${
@@ -94,105 +93,119 @@ function PasswordStrength({ password }) {
 }
 
 export default function SignUp() {
-
   const navigate = useNavigate();
-  const dispatch=useDispatch();
+  const dispatch = useDispatch();
   const {
     register,
     handleSubmit,
     watch,
-    formState:{errors}
+    formState: { errors },
   } = useForm({
-    resolver:zodResolver(schema)
+    resolver: zodResolver(schema),
   });
-  const loading=useSelector((state)=>state.auth.loading);
+
+  const loading = useSelector((state) => state.auth.loading);
+  const serverError = useSelector((state) => state.auth.error);
   const password = watch("password") || "";
-  const submittedForm = (data)=>{
-    dispatch(registerUser(data));
-   console.log("User Registered");
+
+  const submittedForm = async (data) => {
+    try {
+      await dispatch(registerUser(data)).unwrap();
+      console.log("User Registered successfully");
+      navigate("/");
+    } catch (err) {
+      console.error("Registration failed:", err);
+    }
   };
 
   return (
     <div className="flex items-center justify-center min-h-screen">
-    <motion.div
-      variants={pageVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      className="w-full max-w-md px-4"
-    >
-      <div className="relative bg-white/[0.03] border border-white/[0.08] rounded-2xl p-8 backdrop-blur-xl shadow-2xl shadow-black/40">
+      <motion.div
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        className="w-full max-w-md px-4"
+      >
+        <div className="relative bg-white/[0.03] border border-white/[0.08] rounded-2xl p-8 backdrop-blur-xl shadow-2xl shadow-black/40">
+          <motion.div variants={fadeUp} className="mb-8">
+            <h1 className="text-2xl font-bold text-white mb-1">
+              Create your account
+            </h1>
+            <p className="text-sm text-slate-500">
+              Get started in seconds
+            </p>
+          </motion.div>
 
-        <motion.div variants={fadeUp} className="mb-8">
-          <h1 className="text-2xl font-bold text-white mb-1">
-            Create your account
-          </h1>
-          <p className="text-sm text-slate-500">
-            Get started in seconds
-          </p>
-        </motion.div>
-
-        <form onSubmit={handleSubmit(submittedForm)} className="space-y-5">
-
-          <InputField
-            label="Full Name"
-            type="text"
-            placeholder="John Doe"
-            register={register}
-            name="firstName"
-            error={errors.firstName}
-          />
-
-          <InputField
-            label="Email"
-            type="email"
-            placeholder="you@email.com"
-            register={register}
-            name="emailId"
-            error={errors.emailId}
-          />
-
-          <div>
+          <form onSubmit={handleSubmit(submittedForm)} className="space-y-5">
             <InputField
-              label="Password"
-              type="password"
-              placeholder="Min 8 characters"
+              label="Full Name"
+              type="text"
+              placeholder="John Doe"
               register={register}
-              name="password"
-              error={errors.password}
+              name="firstName"
+              error={errors.firstName}
             />
 
-            <PasswordStrength password={password}/>
-          </div>
+            <InputField
+              label="Email"
+              type="email"
+              placeholder="you@email.com"
+              register={register}
+              name="emailId"
+              error={errors.emailId}
+            />
 
-          <motion.button
+            <div>
+              <InputField
+                label="Password"
+                type="password"
+                placeholder="Min 8 characters"
+                register={register}
+                name="password"
+                error={errors.password}
+              />
+
+              <PasswordStrength password={password} />
+            </div>
+
+            <motion.button
+              variants={fadeUp}
+              type="submit"
+              disabled={loading}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-semibold disabled:opacity-50"
+            >
+              {loading ? "Creating account..." : "Create account"}
+            </motion.button>
+
+            {/* Backend Server Error Message Display */}
+            {serverError && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-center"
+              >
+                <p className="text-red-400 text-xs font-medium">{serverError}</p>
+              </motion.div>
+            )}
+          </form>
+
+          <motion.p
             variants={fadeUp}
-            type="submit"
-            disabled={loading}
-            whileHover={{scale:1.02}}
-            whileTap={{scale:0.97}}
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-semibold"
+            className="text-center text-sm text-slate-500 mt-6"
           >
-            {loading ? "Creating account..." : "Create account"}
-          </motion.button>
-
-        </form>
-
-        <motion.p
-          variants={fadeUp}
-          className="text-center text-sm text-slate-500 mt-6"
-        >
-          Already have an account?{" "}
-          <button
-            onClick={()=>navigate("/login")}
-            className="text-violet-400 hover:text-violet-300 font-semibold"
-          >
-            Sign in
-          </button>
-        </motion.p>
-
-      </div>
-    </motion.div>
+            Already have an account?{" "}
+            <button
+              onClick={() => navigate("/login")}
+              className="text-violet-400 hover:text-violet-300 font-semibold"
+            >
+              Sign in
+            </button>
+          </motion.p>
+        </div>
+      </motion.div>
     </div>
   );
 }

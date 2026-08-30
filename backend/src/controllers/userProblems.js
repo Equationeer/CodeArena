@@ -1,4 +1,5 @@
 const {
+  normalizeLanguage,
   getLanguageById,
   submitBatch,
   submitToken,
@@ -6,7 +7,7 @@ const {
 const axios = require("axios");
 const Problem = require("../Models/problem");
 const User = require("../Models/user");
-const Submission=require("../Models/submissions");
+const Submission = require("../Models/submissions");
 
 const createProblem = async (req, res) => {
   const {
@@ -22,34 +23,42 @@ const createProblem = async (req, res) => {
   } = req.body;
   // console.log(req.body);
   try {
-    for (const { language, completeCode } of referenceSolution) {
-      // source_code
-      // language_id
-      // stdin:
-      // output
-      const languageId = getLanguageById(language);
+    const normalizedRefSol = (referenceSolution || []).map((sol) => ({
+      ...sol,
+      language: normalizeLanguage(sol.language),
+    }));
 
-      const submissions = visibleTestCases.map((testcase) => ({
+    const normalizedStartCode = (startCode || []).map((sc) => ({
+      ...sc,
+      language: normalizeLanguage(sc.language),
+    }));
+
+    for (const { language, completeCode } of normalizedRefSol) {
+      const languageId = getLanguageById(language);
+      if (!languageId) {
+        return res.status(400).json({ error: `Unsupported language in reference solution: ${language}` });
+      }
+
+      const submissions = (visibleTestCases || []).map((testcase) => ({
         source_code: completeCode,
         language_id: languageId,
         stdin: testcase.input,
         expected_output: testcase.output,
       }));
-      // console.log("submiison\n"+submissions)
       const submitResult = await submitBatch(submissions);
-      // console.log(submitResult);
       const resultToken = submitResult.map((value) => value.token);
       const testResult = await submitToken(resultToken);
-      // console.log(testResult);
       for (const test of testResult) {
         if (test.status_id != 3) {
-          return res.status(400).send("Error Occured");
+          return res.status(400).json({ error: "Reference solution failed visible test cases" });
         }
       }
     }
     // now everthing is fine then we store in db
     const userProblem = await Problem.create({
       ...req.body,
+      startCode: normalizedStartCode,
+      referenceSolution: normalizedRefSol,
       problemCreator: req.user._id,
     });
     res.status(201).send("Problem saved successfully");
@@ -77,42 +86,56 @@ const updateProblem = async (req, res) => {
     const IsCorrectId = await Problem.findById(id);
     if (!IsCorrectId) return res.status(404).send("Id not present in database");
 
-    for (const { language, completeCode } of referenceSolution) {
-      // source_code
-      // language_id
-      // stdin:
-      // output
-      const languageId = getLanguageById(language);
+    const updateData = { ...req.body };
 
-      const submissions = visibleTestCases.map((testcase) => ({
-        source_code: completeCode,
-        language_id: languageId,
-        stdin: testcase.input,
-        expected_output: testcase.output,
+    if (referenceSolution) {
+      const normalizedRefSol = referenceSolution.map((sol) => ({
+        ...sol,
+        language: normalizeLanguage(sol.language),
       }));
+      updateData.referenceSolution = normalizedRefSol;
 
-      const submitResult = await submitBatch(submissions);
+      const testCasesToRun = visibleTestCases || IsCorrectId.visibleTestCases || [];
+      for (const { language, completeCode } of normalizedRefSol) {
+        const languageId = getLanguageById(language);
+        if (!languageId) {
+          return res.status(400).json({ error: `Unsupported language: ${language}` });
+        }
 
-      const resultToken = submitResult.map((value) => value.token);
-      // console.log(resultToken);
-      const testResult = await submitToken(resultToken);
-      // console.log(testResult);
-      for (const test of testResult) {
-        if (test.status_id != 3) {
-          return res.status(400).send("Error Occured");
+        const submissions = testCasesToRun.map((testcase) => ({
+          source_code: completeCode,
+          language_id: languageId,
+          stdin: testcase.input,
+          expected_output: testcase.output,
+        }));
+
+        const submitResult = await submitBatch(submissions);
+        const resultToken = submitResult.map((value) => value.token);
+        const testResult = await submitToken(resultToken);
+        for (const test of testResult) {
+          if (test.status_id != 3) {
+            return res.status(400).json({ error: "Reference solution failed visible test cases" });
+          }
         }
       }
     }
+
+    if (startCode) {
+      updateData.startCode = startCode.map((sc) => ({
+        ...sc,
+        language: normalizeLanguage(sc.language),
+      }));
+    }
+
     const newProblem = await Problem.findByIdAndUpdate(
       id,
-      { ...req.body },
+      updateData,
       { runValidators: true, new: true },
     );
 
-    res.status(201).send(newProblem);
+    res.status(200).json(newProblem);
   } catch (err) {
-    // console.log(err.response?.data || err.message);
-    res.status(500).send("Error" + err.message);
+    res.status(500).json({ error: err.message || "Failed to update problem" });
   }
 };
 
