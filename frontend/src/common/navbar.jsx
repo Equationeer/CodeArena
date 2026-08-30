@@ -33,7 +33,7 @@ const Navbar = () => {
         whileTap={{ scale: 0.95 }}
         className="text-2xl font-bold text-yellow-400 cursor-pointer tracking-tight"
       >
-        <button onClick={()=>{navigate("/")}}> LeetCode</button>
+        <button onClick={()=>{navigate("/")}}> CodeArena</button>
       </motion.div>
 
       {/* Right Section: Auth UI */}
