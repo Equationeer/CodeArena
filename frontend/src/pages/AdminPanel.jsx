@@ -178,7 +178,7 @@ const AdminDashboard = () => {
           transition={{ delay: 1, duration: 1 }}
           className="mt-20 pt-8 border-t border-slate-900 flex flex-col md:flex-row justify-between items-center text-slate-500 text-sm"
         >
-          <p>© 2024 Solver Platform Inc. All system actions are logged.</p>
+          <p>© CodeArena</p>
           <div className="flex space-x-6 mt-4 md:mt-0">
             <a href="#" className="hover:text-indigo-400 transition-colors">Documentation</a>
             <a href="#" className="hover:text-indigo-400 transition-colors">System Status</a>
