@@ -41,8 +41,9 @@ const cardVariants = {
 const ActionCard = ({ title, description, icon: Icon, colorClass, shadowColor,index }) => {
     const navigate=useNavigate();
     const handleAction=(index)=>{
-        if(index==0) navigate("registerAdmin")
+        if(index==0) navigate("registerAdmin");
         if(index==1) navigate("createProblem");
+        if(index==2) navigate("updateProblem");
         if(index==3) navigate("deleteProblem");
         if(index==4) navigate("uploadVideo");
     }

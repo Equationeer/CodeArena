@@ -33,7 +33,7 @@ const problemSchema = new Schema({
       },
       explaination: {
         type: String,
-        required: true,
+        default: "",
       },
     },
   ],

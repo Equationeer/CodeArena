@@ -68,7 +68,6 @@ const createProblem = async (req, res) => {
   }
 };
 const updateProblem = async (req, res) => {
-  // console.log(req.body);
   const {
     title,
     description,
@@ -78,63 +77,90 @@ const updateProblem = async (req, res) => {
     invisibleTestCases,
     startCode,
     referenceSolution,
-    problemCreator,
   } = req.body;
   const { id } = req.params;
+
   try {
     if (!id) return res.status(400).send("Id Invalid");
-    const IsCorrectId = await Problem.findById(id);
-    if (!IsCorrectId) return res.status(404).send("Id not present in database");
+    const existingProblem = await Problem.findById(id);
+    if (!existingProblem) return res.status(404).send("Id not present in database");
 
-    const updateData = { ...req.body };
+    const updateData = {};
 
-    if (referenceSolution) {
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (difficultyLevel !== undefined) updateData.difficultyLevel = difficultyLevel;
+    if (tags !== undefined) updateData.tags = tags;
+
+    if (visibleTestCases !== undefined) {
+      updateData.visibleTestCases = visibleTestCases.map((tc) => ({
+        input: String(tc.input ?? ""),
+        output: String(tc.output ?? ""),
+        explaination: tc.explaination || tc.explanation || "",
+      }));
+    }
+
+    if (invisibleTestCases !== undefined) {
+      updateData.invisibleTestCases = invisibleTestCases.map((tc) => ({
+        input: String(tc.input ?? ""),
+        output: String(tc.output ?? ""),
+      }));
+    }
+
+    if (startCode !== undefined) {
+      updateData.startCode = startCode.map((sc) => ({
+        language: normalizeLanguage(sc.language),
+        initialCode: sc.initialCode || sc.code || "",
+      }));
+    }
+
+    if (referenceSolution !== undefined) {
       const normalizedRefSol = referenceSolution.map((sol) => ({
-        ...sol,
         language: normalizeLanguage(sol.language),
+        completeCode: sol.completeCode || sol.code || "",
       }));
       updateData.referenceSolution = normalizedRefSol;
 
-      const testCasesToRun = visibleTestCases || IsCorrectId.visibleTestCases || [];
-      for (const { language, completeCode } of normalizedRefSol) {
-        const languageId = getLanguageById(language);
-        if (!languageId) {
-          return res.status(400).json({ error: `Unsupported language: ${language}` });
-        }
+      // Validate reference solution against visible test cases
+      const testCasesToRun = (updateData.visibleTestCases || existingProblem.visibleTestCases || []);
+      if (testCasesToRun.length > 0) {
+        for (const { language, completeCode } of normalizedRefSol) {
+          const languageId = getLanguageById(language);
+          if (!languageId) {
+            return res.status(400).json({ error: `Unsupported language: ${language}` });
+          }
 
-        const submissions = testCasesToRun.map((testcase) => ({
-          source_code: completeCode,
-          language_id: languageId,
-          stdin: testcase.input,
-          expected_output: testcase.output,
-        }));
+          const submissions = testCasesToRun.map((testcase) => ({
+            source_code: completeCode,
+            language_id: languageId,
+            stdin: testcase.input != null ? String(testcase.input) : "",
+            expected_output: testcase.output != null ? String(testcase.output) : "",
+          }));
 
-        const submitResult = await submitBatch(submissions);
-        const resultToken = submitResult.map((value) => value.token);
-        const testResult = await submitToken(resultToken);
-        for (const test of testResult) {
-          if (test.status_id != 3) {
-            return res.status(400).json({ error: "Reference solution failed visible test cases" });
+          const submitResult = await submitBatch(submissions);
+          const resultToken = submitResult.map((value) => value.token);
+          const testResult = await submitToken(resultToken);
+
+          for (const test of testResult) {
+            if (test.status_id != 3) {
+              return res.status(400).json({
+                error: `Reference solution (${language}) failed visible test cases. Status: ${test.status?.description || test.status_id}`,
+              });
+            }
           }
         }
       }
     }
 
-    if (startCode) {
-      updateData.startCode = startCode.map((sc) => ({
-        ...sc,
-        language: normalizeLanguage(sc.language),
-      }));
-    }
-
-    const newProblem = await Problem.findByIdAndUpdate(
+    const updatedProblem = await Problem.findByIdAndUpdate(
       id,
-      updateData,
+      { $set: updateData },
       { runValidators: true, new: true },
     );
 
-    res.status(200).json(newProblem);
+    res.status(200).json(updatedProblem);
   } catch (err) {
+    console.error("updateProblem error:", err);
     res.status(500).json({ error: err.message || "Failed to update problem" });
   }
 };
@@ -164,6 +190,17 @@ const getProblemById = async (req, res) => {
     res.status(500).send("Error" + err.message);
   }
 };
+const getProblemForAdmin = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const problem = await Problem.findById(id);
+    if (!problem) return res.status(404).json({ error: "Problem Not found" });
+    res.status(200).json(problem);
+  } catch (err) {
+    res.status(500).json({ error: "Error: " + err.message });
+  }
+};
+
 const getAllProblem = async (req, res) => {
   try {
     // pagination can be added later
@@ -205,6 +242,7 @@ module.exports = {
   updateProblem,
   deleteProblem,
   getProblemById,
+  getProblemForAdmin,
   getAllProblem,
   solvedAllProblemByUser,
   submittedProblem
