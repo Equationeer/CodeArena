@@ -236,11 +236,8 @@ const EditProblemForm = ({ problemId, onBack, onUpdated }) => {
       })),
     };
 
-    console.log("Submitting update payload:", JSON.stringify(payload, null, 2));
-
     try {
       const res = await axiosMain.put(`problem/update/${problemId}`, payload);
-      console.log("Update response:", res.data);
       setServerSuccess("Problem updated successfully!");
       if (onUpdated) onUpdated();
     } catch (err) {
