@@ -13,6 +13,9 @@ Real-time code execution · Multi-language support · Role-based access control 
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
+
+### [View Live Demo](https://code-arena-rho-smoky.vercel.app/)
+
 [Overview](#overview) &nbsp;·&nbsp;
 [Features](#features) &nbsp;·&nbsp;
 [Architecture](#architecture) &nbsp;·&nbsp;
