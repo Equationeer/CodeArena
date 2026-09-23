@@ -29,12 +29,12 @@ Real-time code execution · Multi-language support · Role-based access control 
 - [Overview](#overview)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
 - [Architecture](#architecture)
 - [Quick Start](#quick-start)
 - [Environment Variables](#environment-variables)
 - [API Reference](#api-reference)
 - [Supported Languages](#supported-languages)
-- [Project Structure](#project-structure)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
@@ -103,6 +103,66 @@ Administrators have full control over the problem lifecycle — creating, updati
 | Judge0 CE (RapidAPI) | Isolated sandboxed code execution engine |
 | Cloudinary | Video and media asset storage and delivery |
 | Multer | Multipart file upload handling |
+
+---
+
+## Project Structure
+
+```
+CodeArena/
+│
+├── backend/
+│   └── src/
+│       ├── controllers/
+│       │   ├── userAuthent.js         # Authentication logic
+│       │   ├── userProblems.js        # Problem CRUD and admin operations
+│       │   ├── userSubmission.js      # Code execution via Judge0
+│       │   └── videoUploader.js       # Cloudinary video management
+│       ├── middleware/
+│       │   ├── adminMiddleware.js     # JWT verification + admin role guard
+│       │   └── userMiddleware.js      # JWT verification + user role guard
+│       ├── Models/
+│       │   ├── problem.js             # Problem schema
+│       │   ├── submissions.js         # Submission schema
+│       │   └── user.js                # User schema
+│       ├── Routes/
+│       │   ├── problemCreator.js      # Problem route definitions
+│       │   ├── userRouter.js          # Auth route definitions
+│       │   ├── submissionRouter.js    # Submission route definitions
+│       │   └── videoRouter.js         # Video route definitions
+│       ├── utils/
+│       │   ├── problemUtility.js      # Judge0 batch submission helpers
+│       │   └── validate.js            # Request validation helpers
+│       └── index.js                   # Express application entry point
+│
+└── frontend/
+    └── src/
+        ├── pages/
+        │   ├── HomePage.jsx
+        │   ├── Problems.jsx
+        │   ├── ProblemDetail.jsx
+        │   ├── Profile.jsx
+        │   ├── Login.jsx
+        │   ├── SignUp.jsx
+        │   ├── AdminPanel.jsx
+        │   ├── CreateProblem.jsx
+        │   ├── UpdateProblem.jsx
+        │   ├── DeleteProblem.jsx
+        │   └── AdminRegister.jsx
+        ├── components/
+        │   ├── ProblemTable.jsx
+        │   ├── ProblemCard.jsx
+        │   ├── Result.jsx
+        │   ├── Editorial.jsx
+        │   ├── VideoCreator.jsx
+        │   └── Confirmation.jsx
+        ├── common/
+        │   └── navbar.jsx
+        ├── utils/
+        │   └── axios.js               # Axios instance with base URL configuration
+        ├── Slice.js                   # Redux slices (auth + problems)
+        └── App.jsx                    # Route definitions and auth guards
+```
 
 ---
 
@@ -272,66 +332,6 @@ Create a `.env` file in the `backend/` directory using the following reference:
 
 ---
 
-## Project Structure
-
-```
-CodeArena/
-│
-├── backend/
-│   └── src/
-│       ├── controllers/
-│       │   ├── userAuthent.js         # Authentication logic
-│       │   ├── userProblems.js        # Problem CRUD and admin operations
-│       │   ├── userSubmission.js      # Code execution via Judge0
-│       │   └── videoUploader.js       # Cloudinary video management
-│       ├── middleware/
-│       │   ├── adminMiddleware.js     # JWT verification + admin role guard
-│       │   └── userMiddleware.js      # JWT verification + user role guard
-│       ├── Models/
-│       │   ├── problem.js             # Problem schema
-│       │   ├── submissions.js         # Submission schema
-│       │   └── user.js                # User schema
-│       ├── Routes/
-│       │   ├── problemCreator.js      # Problem route definitions
-│       │   ├── userRouter.js          # Auth route definitions
-│       │   ├── submissionRouter.js    # Submission route definitions
-│       │   └── videoRouter.js         # Video route definitions
-│       ├── utils/
-│       │   ├── problemUtility.js      # Judge0 batch submission helpers
-│       │   └── validate.js            # Request validation helpers
-│       └── index.js                   # Express application entry point
-│
-└── frontend/
-    └── src/
-        ├── pages/
-        │   ├── HomePage.jsx
-        │   ├── Problems.jsx
-        │   ├── ProblemDetail.jsx
-        │   ├── Profile.jsx
-        │   ├── Login.jsx
-        │   ├── SignUp.jsx
-        │   ├── AdminPanel.jsx
-        │   ├── CreateProblem.jsx
-        │   ├── UpdateProblem.jsx
-        │   ├── DeleteProblem.jsx
-        │   └── AdminRegister.jsx
-        ├── components/
-        │   ├── ProblemTable.jsx
-        │   ├── ProblemCard.jsx
-        │   ├── Result.jsx
-        │   ├── Editorial.jsx
-        │   ├── VideoCreator.jsx
-        │   └── Confirmation.jsx
-        ├── common/
-        │   └── navbar.jsx
-        ├── utils/
-        │   └── axios.js               # Axios instance with base URL configuration
-        ├── Slice.js                   # Redux slices (auth + problems)
-        └── App.jsx                    # Route definitions and auth guards
-```
-
----
-
 ## Roadmap
 
 The following features are planned for future releases:
@@ -364,7 +364,7 @@ Contributions are welcome and encouraged. To get started:
    ```
 5. Open a Pull Request against the `main` branch.
 
-Please ensure all changes are accompanied by appropriate documentation updates. For significant changes, open an issue first to discuss the proposal before submitting a PR.
+Please ensure all changes are accompanied by appropriate documentation updates. For significant changes, open an issue first to discuss the proposal before submitting a pull request.
 
 ---
 
